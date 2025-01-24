@@ -340,7 +340,7 @@ module server_elasticPools 'elastic-pool/main.bicep' = [
   }
 ]
 
-module server_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.9.1' = [
+module server_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.10.0' = [
   for (privateEndpoint, index) in (privateEndpoints ?? []): {
     name: '${uniqueString(deployment().name, location)}-server-PrivateEndpoint-${index}'
     scope: !empty(privateEndpoint.?resourceGroupResourceId)
@@ -575,8 +575,8 @@ output privateEndpoints privateEndpointOutputType[] = [
   for (pe, i) in (!empty(privateEndpoints) ? array(privateEndpoints) : []): {
     name: server_privateEndpoints[i].outputs.name
     resourceId: server_privateEndpoints[i].outputs.resourceId
-    groupId: server_privateEndpoints[i].outputs.groupId
-    customDnsConfigs: server_privateEndpoints[i].outputs.customDnsConfig
+    groupId: server_privateEndpoints[i].outputs.?groupId
+    customDnsConfigs: server_privateEndpoints[i].outputs.customDnsConfigs
     networkInterfaceResourceIds: server_privateEndpoints[i].outputs.networkInterfaceResourceIds
   }
 ]
