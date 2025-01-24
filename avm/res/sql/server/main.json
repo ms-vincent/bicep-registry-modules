@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "128631914679085754"
+      "templateHash": "6744674803235996828"
     },
     "name": "Azure SQL Servers",
     "description": "This module deploys an Azure SQL Server."
@@ -29,7 +29,6 @@
         },
         "groupId": {
           "type": "string",
-          "nullable": true,
           "metadata": {
             "description": "The group Id for the private endpoint Group."
           }
@@ -5606,7 +5605,7 @@
             "value": "[last(split(coalesce(tryGet(parameters('secretsExportConfiguration'), 'keyVaultResourceId'), '//'), '/'))]"
           },
           "secretsToSet": {
-            "value": "[union(createArray(), if(contains(parameters('secretsExportConfiguration'), 'sqlAdminPasswordSecretName'), createArray(createObject('name', parameters('secretsExportConfiguration').sqlAdminPasswordSecretName, 'value', parameters('administratorLoginPassword'))), createArray()), if(contains(parameters('secretsExportConfiguration'), 'sqlAzureConnectionStringSercretName'), createArray(createObject('name', parameters('secretsExportConfiguration').sqlAzureConnectionStringSercretName, 'value', format('Server={0}; Database={1}; User={2}; Password={3}', reference('server').fullyQualifiedDomainName, if(not(empty(parameters('databases'))), parameters('databases')[0].name, ''), parameters('administratorLogin'), parameters('administratorLoginPassword')))), createArray()))]"
+            "value": "[union(createArray(), if(contains(parameters('secretsExportConfiguration'), 'sqlAdminPasswordSecretName'), createArray(createObject('name', tryGet(parameters('secretsExportConfiguration'), 'sqlAdminPasswordSecretName'), 'value', parameters('administratorLoginPassword'))), createArray()), if(contains(parameters('secretsExportConfiguration'), 'sqlAzureConnectionStringSercretName'), createArray(createObject('name', tryGet(parameters('secretsExportConfiguration'), 'sqlAzureConnectionStringSercretName'), 'value', format('Server={0}; Database={1}; User={2}; Password={3}', reference('server').fullyQualifiedDomainName, if(not(empty(parameters('databases'))), parameters('databases')[0].name, ''), parameters('administratorLogin'), parameters('administratorLoginPassword')))), createArray()))]"
           }
         },
         "template": {
@@ -6017,7 +6016,7 @@
         "input": {
           "name": "[reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs.name.value]",
           "resourceId": "[reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs.resourceId.value]",
-          "groupId": "[tryGet(tryGet(reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs, 'groupId'), 'value')]",
+          "groupId": "[reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs.groupId.value]",
           "customDnsConfigs": "[reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs.customDnsConfigs.value]",
           "networkInterfaceResourceIds": "[reference(format('server_privateEndpoints[{0}]', copyIndex())).outputs.networkInterfaceResourceIds.value]"
         }

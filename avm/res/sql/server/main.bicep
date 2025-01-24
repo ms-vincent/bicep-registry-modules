@@ -511,7 +511,7 @@ module secretsExport 'modules/keyVaultExport.bicep' = if (secretsExportConfigura
       contains(secretsExportConfiguration!, 'sqlAdminPasswordSecretName')
         ? [
             {
-              name: secretsExportConfiguration!.sqlAdminPasswordSecretName
+              name: secretsExportConfiguration!.?sqlAdminPasswordSecretName!
               value: administratorLoginPassword
             }
           ]
@@ -519,7 +519,7 @@ module secretsExport 'modules/keyVaultExport.bicep' = if (secretsExportConfigura
       contains(secretsExportConfiguration!, 'sqlAzureConnectionStringSercretName')
         ? [
             {
-              name: secretsExportConfiguration!.sqlAzureConnectionStringSercretName
+              name: secretsExportConfiguration!.?sqlAzureConnectionStringSercretName!
               value: 'Server=${server.properties.fullyQualifiedDomainName}; Database=${!empty(databases) ? databases[0].name : ''}; User=${administratorLogin}; Password=${administratorLoginPassword}'
             }
           ]
@@ -575,7 +575,7 @@ output privateEndpoints privateEndpointOutputType[] = [
   for (pe, i) in (!empty(privateEndpoints) ? array(privateEndpoints) : []): {
     name: server_privateEndpoints[i].outputs.name
     resourceId: server_privateEndpoints[i].outputs.resourceId
-    groupId: server_privateEndpoints[i].outputs.?groupId
+    groupId: server_privateEndpoints[i].outputs.groupId
     customDnsConfigs: server_privateEndpoints[i].outputs.customDnsConfigs
     networkInterfaceResourceIds: server_privateEndpoints[i].outputs.networkInterfaceResourceIds
   }
@@ -601,7 +601,7 @@ type privateEndpointOutputType = {
   resourceId: string
 
   @description('The group Id for the private endpoint Group.')
-  groupId: string?
+  groupId: string
 
   @description('The custom DNS configurations of the private endpoint.')
   customDnsConfigs: {
