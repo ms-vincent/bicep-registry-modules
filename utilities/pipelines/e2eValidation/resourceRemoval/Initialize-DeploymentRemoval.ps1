@@ -78,6 +78,7 @@ function Initialize-DeploymentRemoval {
             'Microsoft.Insights/diagnosticSettings',
             'Microsoft.Network/privateEndpoints/privateDnsZoneGroups',
             'Microsoft.Network/privateEndpoints',
+            'Microsoft.Network privateLinkServices/privateEndpointConnections', # Must be removed before its private link service
             'Microsoft.Network/azureFirewalls',
             'Microsoft.Network/virtualHubs',
             'Microsoft.Network/virtualWans',
