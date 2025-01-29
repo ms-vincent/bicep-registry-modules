@@ -154,7 +154,6 @@ function Initialize-DeploymentRemoval {
         $inputObject = @{
             DeploymentNames     = $DeploymentNames
             ResourceIds         = $ResourceIds
-            TemplateFilePath    = $TemplateFilePath
             RemoveFirstSequence = $removeFirstSequence
             RemoveLastSequence  = $removeLastSequence
         }
