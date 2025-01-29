@@ -163,6 +163,13 @@ module testDeployment '../../../main.bicep' = {
       Environment: 'Non-Prod'
       Role: 'DeploymentValidation'
     }
+    autoRunState: 'Enabled'
+    errorHandlingOnCustomizerError: 'cleanup'
+    errorHandlingOnValidationError: 'abort'
+    managedResourceTags: {
+      testKey1: 'testValue1'
+      testKey2: 'testValue2'
+    }
   }
 }
 

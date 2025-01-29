@@ -49,7 +49,6 @@ module testDeployment '../../../main.bicep' = {
   name: '${uniqueString(deployment().name, resourceLocation)}-test-${serviceShort}'
   params: {
     name: '${namePrefix}${serviceShort}001'
-    location: resourceLocation
     imageSource: {
       offer: 'Windows-11'
       publisher: 'MicrosoftWindowsDesktop'
@@ -57,14 +56,12 @@ module testDeployment '../../../main.bicep' = {
       type: 'PlatformImage'
       version: 'latest'
     }
-
     distributions: [
       {
         imageName: '${namePrefix}-mi-${serviceShort}-001'
         type: 'ManagedImage'
       }
     ]
-
     managedIdentities: {
       userAssignedResourceIds: [
         nestedDependencies.outputs.managedIdentityResourceId
