@@ -273,7 +273,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
     }
     modules: [
       {
-        name: 'PSWindowsUpdate'
+        name: 'Az.Accounts'
         uri: 'https://www.powershellgallery.com/api/v2/package'
         version: 'latest'
       }
@@ -548,7 +548,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
     "modules": {
       "value": [
         {
-          "name": "PSWindowsUpdate",
+          "name": "Az.Accounts",
           "uri": "https://www.powershellgallery.com/api/v2/package",
           "version": "latest"
         }
@@ -815,7 +815,7 @@ param managedIdentities = {
 }
 param modules = [
   {
-    name: 'PSWindowsUpdate'
+    name: 'Az.Accounts'
     uri: 'https://www.powershellgallery.com/api/v2/package'
     version: 'latest'
   }
@@ -1057,7 +1057,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
     }
     modules: [
       {
-        name: 'PSWindowsUpdate'
+        name: 'Az.Accounts'
         uri: 'https://www.powershellgallery.com/api/v2/package'
         version: 'latest'
       }
@@ -1280,7 +1280,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
     "modules": {
       "value": [
         {
-          "name": "PSWindowsUpdate",
+          "name": "Az.Accounts",
           "uri": "https://www.powershellgallery.com/api/v2/package",
           "version": "latest"
         }
@@ -1495,7 +1495,7 @@ param managedIdentities = {
 }
 param modules = [
   {
-    name: 'PSWindowsUpdate'
+    name: 'Az.Accounts'
     uri: 'https://www.powershellgallery.com/api/v2/package'
     version: 'latest'
   }

@@ -112,7 +112,7 @@ module testDeployment '../../../main.bicep' = [
       }
       modules: [
         {
-          name: 'PSWindowsUpdate'
+          name: 'Az.Accounts'
           uri: 'https://www.powershellgallery.com/api/v2/package'
           version: 'latest'
         }
