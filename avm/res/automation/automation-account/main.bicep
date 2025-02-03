@@ -198,7 +198,7 @@ resource automationAccount 'Microsoft.Automation/automationAccounts@2022-08-08' 
             keyName: customerManagedKey!.keyName
             keyvaultUri: cMKKeyVault.properties.vaultUri
             keyVersion: !empty(customerManagedKey.?keyVersion ?? '')
-              ? customerManagedKey!.keyVersion
+              ? customerManagedKey!.?keyVersion
               : last(split(cMKKeyVault::cMKKey.properties.keyUriWithVersion, '/'))
           }
         }
@@ -524,7 +524,7 @@ output privateEndpoints array = [
     name: automationAccount_privateEndpoints[i].outputs.name
     resourceId: automationAccount_privateEndpoints[i].outputs.resourceId
     groupId: automationAccount_privateEndpoints[i].outputs.groupId
-    customDnsConfig: automationAccount_privateEndpoints[i].outputs.customDnsConfig
+    customDnsConfig: automationAccount_privateEndpoints[i].outputs.?customDnsConfig
     networkInterfaceIds: automationAccount_privateEndpoints[i].outputs.networkInterfaceIds
   }
 ]

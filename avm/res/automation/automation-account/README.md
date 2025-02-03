@@ -122,7 +122,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
   name: 'automationAccountDeployment'
   params: {
     // Required parameters
-    name: 'aaencr001'
+    name: 'aaencr002'
     // Non-required parameters
     customerManagedKey: {
       keyName: '<keyName>'
@@ -153,7 +153,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
   "parameters": {
     // Required parameters
     "name": {
-      "value": "aaencr001"
+      "value": "aaencr002"
     },
     // Non-required parameters
     "customerManagedKey": {
@@ -188,7 +188,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
 using 'br/public:avm/res/automation/automation-account:<version>'
 
 // Required parameters
-param name = 'aaencr001'
+param name = 'aaencr002'
 // Non-required parameters
 param customerManagedKey = {
   keyName: '<keyName>'
@@ -220,7 +220,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
   name: 'automationAccountDeployment'
   params: {
     // Required parameters
-    name: 'aamax001'
+    name: 'aamax002'
     // Non-required parameters
     credentials: [
       {
@@ -475,7 +475,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
   "parameters": {
     // Required parameters
     "name": {
-      "value": "aamax001"
+      "value": "aamax002"
     },
     // Non-required parameters
     "credentials": {
@@ -762,7 +762,7 @@ module automationAccount 'br/public:avm/res/automation/automation-account:<versi
 using 'br/public:avm/res/automation/automation-account:<version>'
 
 // Required parameters
-param name = 'aamax001'
+param name = 'aamax002'
 // Non-required parameters
 param credentials = [
   {
