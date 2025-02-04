@@ -569,8 +569,7 @@ Describe 'Module tests' -Tag 'Module' {
             It '[<moduleFolderName>] Variable `var enableReferencedModulesTelemetry = false` should exist if module references other modules with dedicated telemetry.' -TestCases $moduleFolderTestCases {
 
                 param(
-                    [hashtable] $templateFileContent,
-                    [string] $templateFilePath
+                    [hashtable] $templateFileContent
                 )
 
                 $referencesWithTelemetry = $templateFileContent.resources.Values | Where-Object {
@@ -590,8 +589,7 @@ Describe 'Module tests' -Tag 'Module' {
             It '[<moduleFolderName>] Telemetry should be disabled for referenced modules with dedicated telemetry.' -TestCases $moduleFolderTestCases {
 
                 param(
-                    [hashtable] $templateFileContent,
-                    [string] $templateFilePath
+                    [hashtable] $templateFileContent
                 )
 
                 $referencesWithTelemetry = @()
