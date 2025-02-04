@@ -73,7 +73,6 @@ runs:
           # List of modules requiring more that 1 hour to deploy and delete resources
           $modulePath = "${{ inputs.modulePath }}"
           $exceptionModulePaths = @(
-            'avm/res/automation/automation-account'              # Has timeout during module installation
             'avm/ptn/lz/sub-vending'                             # Requires additional OIDC MSI permissions
             'avm/res/compute/image'                              # Failing on resource deletion when trying to delete RBAC at subscription level
             'avm/res/compute/disk'                               # Failing on resource deletion when trying to delete RBAC at subscription level
