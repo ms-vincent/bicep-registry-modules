@@ -19,6 +19,9 @@ param attributesExp int?
 @description('Optional. Not before date in seconds since 1970-01-01T00:00:00Z.')
 param attributesNbf int?
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = true
+
 @description('Optional. The elliptic curve name.')
 @allowed([
   'P-256'

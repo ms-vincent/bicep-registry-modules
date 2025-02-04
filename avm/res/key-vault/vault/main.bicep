@@ -84,6 +84,8 @@ param diagnosticSettings diagnosticSettingFullType[]?
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
+var enableReferencedModuleTelemetry = false
+
 // =========== //
 // Variables   //
 // =========== //
@@ -300,6 +302,7 @@ module keyVault_keys 'key/main.bicep' = [
       tags: key.?tags ?? tags
       roleAssignments: key.?roleAssignments
       rotationPolicy: key.?rotationPolicy
+      enableTelemetry: enableReferencedModuleTelemetry
     }
   }
 ]
