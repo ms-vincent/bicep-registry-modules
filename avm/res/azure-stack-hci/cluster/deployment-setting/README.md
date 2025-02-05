@@ -47,23 +47,15 @@ This module deploys an Azure Stack HCI Cluster Deployment Settings resource.
 
 | Parameter | Type | Description |
 | :-- | :-- | :-- |
-| [`bitlockerBootVolume`](#parameter-bitlockerbootvolume) | bool | When set to true, BitLocker XTS_AES 256-bit encryption is enabled for all data-at-rest on the OS volume of your Azure Stack HCI cluster. This setting is TPM-hardware dependent. |
-| [`bitlockerDataVolumes`](#parameter-bitlockerdatavolumes) | bool | When set to true, BitLocker XTS-AES 256-bit encryption is enabled for all data-at-rest on your Azure Stack HCI cluster shared volumes. |
 | [`cloudId`](#parameter-cloudid) | string | If using a shared key vault or non-legacy secret naming, pass the properties.cloudId guid from the pre-created HCI cluster resource. |
-| [`credentialGuardEnforced`](#parameter-credentialguardenforced) | bool | Enables the Credential Guard. |
-| [`driftControlEnforced`](#parameter-driftcontrolenforced) | bool | When set to true, the security baseline is re-applied regularly. |
-| [`drtmProtection`](#parameter-drtmprotection) | bool | The hardware-dependent Secure Boot setting. |
 | [`enableStorageAutoIp`](#parameter-enablestorageautoip) | bool | Enable storage auto IP assignment. This should be true for most deployments except when deploying a three-node switchless cluster, in which case storage IPs should be configured before deployment and this value set to false. |
 | [`episodicDataUpload`](#parameter-episodicdataupload) | bool | The diagnostic data for deploying a HCI cluster. |
-| [`hvciProtection`](#parameter-hvciprotection) | bool | The Hypervisor-protected Code Integrity setting. |
 | [`isEuropeanUnionLocation`](#parameter-iseuropeanunionlocation) | bool | The location data for deploying a HCI cluster. |
-| [`name`](#parameter-name) | string | The name of the deployment settings. |
-| [`sideChannelMitigationEnforced`](#parameter-sidechannelmitigationenforced) | bool | When set to true, all the side channel mitigations are enabled. |
-| [`smbClusterEncryption`](#parameter-smbclusterencryption) | bool | When set to true, cluster east-west traffic is encrypted. |
-| [`smbSigningEnforced`](#parameter-smbsigningenforced) | bool | When set to true, the SMB default instance requires sign in for the client and server services. |
+| [`location`](#parameter-location) | string | Location for all resources. |
+| [`securityConfiguration`](#parameter-securityconfiguration) | object | Security configuration settings object; defaults to most secure posture. |
 | [`storageConfigurationMode`](#parameter-storageconfigurationmode) | string | The storage volume configuration mode. See documentation for details. |
 | [`streamingDataClient`](#parameter-streamingdataclient) | bool | The metrics data for deploying a HCI cluster. |
-| [`wdacEnforced`](#parameter-wdacenforced) | bool | Limits the applications and the code that you can run on your Azure Stack HCI cluster. |
+| [`tags`](#parameter-tags) | object | Tags of the resource. |
 
 ### Parameter: `clusterNodeNames`
 
@@ -103,6 +95,7 @@ First must pass with this parameter set to Validate prior running with it set to
   ```Bicep
   [
     'Deploy'
+    'None'
     'Validate'
   ]
   ```
@@ -191,52 +184,12 @@ The name of the Azure Stack HCI cluster - this must be a valid Active Directory 
 - Required: Yes
 - Type: string
 
-### Parameter: `bitlockerBootVolume`
-
-When set to true, BitLocker XTS_AES 256-bit encryption is enabled for all data-at-rest on the OS volume of your Azure Stack HCI cluster. This setting is TPM-hardware dependent.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
-### Parameter: `bitlockerDataVolumes`
-
-When set to true, BitLocker XTS-AES 256-bit encryption is enabled for all data-at-rest on your Azure Stack HCI cluster shared volumes.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
 ### Parameter: `cloudId`
 
 If using a shared key vault or non-legacy secret naming, pass the properties.cloudId guid from the pre-created HCI cluster resource.
 
 - Required: No
 - Type: string
-
-### Parameter: `credentialGuardEnforced`
-
-Enables the Credential Guard.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
-### Parameter: `driftControlEnforced`
-
-When set to true, the security baseline is re-applied regularly.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
-### Parameter: `drtmProtection`
-
-The hardware-dependent Secure Boot setting.
-
-- Required: No
-- Type: bool
-- Default: `True`
 
 ### Parameter: `enableStorageAutoIp`
 
@@ -254,14 +207,6 @@ The diagnostic data for deploying a HCI cluster.
 - Type: bool
 - Default: `True`
 
-### Parameter: `hvciProtection`
-
-The Hypervisor-protected Code Integrity setting.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
 ### Parameter: `isEuropeanUnionLocation`
 
 The location data for deploying a HCI cluster.
@@ -270,43 +215,35 @@ The location data for deploying a HCI cluster.
 - Type: bool
 - Default: `False`
 
-### Parameter: `name`
+### Parameter: `location`
 
-The name of the deployment settings.
+Location for all resources.
 
 - Required: No
 - Type: string
-- Default: `'default'`
-- Allowed:
+- Default: `[resourceGroup().location]`
+
+### Parameter: `securityConfiguration`
+
+Security configuration settings object; defaults to most secure posture.
+
+- Required: No
+- Type: object
+- Default:
   ```Bicep
-  [
-    'default'
-  ]
+  {
+      bitlockerBootVolume: true
+      bitlockerDataVolumes: true
+      credentialGuardEnforced: true
+      driftControlEnforced: true
+      drtmProtection: true
+      hvciProtection: true
+      sideChannelMitigationEnforced: true
+      smbClusterEncryption: true
+      smbSigningEnforced: true
+      wdacEnforced: true
+  }
   ```
-
-### Parameter: `sideChannelMitigationEnforced`
-
-When set to true, all the side channel mitigations are enabled.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
-### Parameter: `smbClusterEncryption`
-
-When set to true, cluster east-west traffic is encrypted.
-
-- Required: No
-- Type: bool
-- Default: `True`
-
-### Parameter: `smbSigningEnforced`
-
-When set to true, the SMB default instance requires sign in for the client and server services.
-
-- Required: No
-- Type: bool
-- Default: `True`
 
 ### Parameter: `storageConfigurationMode`
 
@@ -332,13 +269,12 @@ The metrics data for deploying a HCI cluster.
 - Type: bool
 - Default: `True`
 
-### Parameter: `wdacEnforced`
+### Parameter: `tags`
 
-Limits the applications and the code that you can run on your Azure Stack HCI cluster.
+Tags of the resource.
 
 - Required: No
-- Type: bool
-- Default: `True`
+- Type: object
 
 ## Outputs
 

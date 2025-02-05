@@ -37,18 +37,9 @@ for ($i = 1; $i -le $hciNodeCount; $i++) {
     $hciNodeNames += "hcinode$i"
 }
 
-Set-PSRepository -Name 'PSGallery' -InstallationPolicy 'Trusted'
-foreach ($module in @(
-        'Az.Accounts',
-        'Az.ConnectedMachine')) {
-    if (-not (Get-Module -Name $module -ListAvailable)) {
-        log "Installing module [$module]" -Verbose
-        $res = Install-Module -Name $module -Force -AllowClobber -Scope 'CurrentUser' -Repository 'PSGallery' -Force -Confirm:$false
-        log ("Installed module [$module] with version [{0}]" -f $res.Version)
-    }
-}
-Set-PSRepository -Name 'PSGallery' -InstallationPolicy 'Untrusted'
-
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+Install-Module -Name Az.ConnectedMachine -Force -AllowClobber -Scope CurrentUser -Repository PSGallery -ErrorAction SilentlyContinue
+Set-PSRepository -Name PSGallery -InstallationPolicy Untrusted
 
 log "Logging in to Azure with user-assigned managed identity '$($userAssignedManagedIdentityClientId)'..."
 Login-AzAccount -Identity -Subscription $subscriptionId -AccountId $userAssignedManagedIdentityClientId
@@ -58,8 +49,6 @@ log "Waiting for HCI Arc Machines to exist in the resource group '$($resourceGro
 $timer = [System.Diagnostics.Stopwatch]::StartNew()
 While (($arcMachines = Get-AzConnectedMachine -ResourceGroupName $resourceGroupName | Where-Object { $_.name -in ($hciNodeNames) }).Count -lt $hciNodeNames.Count -and $timer.Elapsed.TotalMinutes -lt 60) {
     log "Found '$($arcMachines.Count)' HCI Arc Machines, waiting for '$($hciNodeNames.Count)' machines for up to 1 hour..."
-    $currentlyConnectedMachines = Get-AzConnectedMachine -ResourceGroupName $resourceGroupName
-    log ('Currently connected machines are [{0}]' -f $currentlyConnectedMachines.Name -join ', ')
     Start-Sleep -Seconds 30
 }
 If ($timer.Elapsed.TotalMinutes -gt 60) {

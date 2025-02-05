@@ -59,8 +59,8 @@ Function log {
         [string]$logPath = 'C:\temp\hciHostDeploy.log'
     )
 
-    If (!(Test-Path -Path 'C:\temp')) {
-        New-Item -Path 'C:\temp' -ItemType Directory
+    If (!(Test-Path -Path C:\temp)) {
+        New-Item -Path C:\temp -ItemType Directory
     }
 
     Write-Host $message
@@ -68,24 +68,6 @@ Function log {
 }
 
 $ErrorActionPreference = 'Stop'
-
-If (!(Get-PackageProvider -Name 'NuGet' -ListAvailable -ErrorAction 'SilentlyContinue')) { Install-PackageProvider -Name NuGet -MinimumVersion '2.8.5.201' -Force }
-If (!(Get-PSRepository -Name 'PSGallery' -ErrorAction 'SilentlyContinue')) { Register-PSRepository -Default }
-Set-PSRepository -Name 'PSGallery' -InstallationPolicy 'Trusted'
-foreach ($module in @(
-        'Az.Accounts',
-        'Az.Resources',
-        'WinInetProxy',
-        'AsHciADArtifactsPreCreationTool',
-        'AzsHCI.ARCinstaller')) {
-    if (-not (Get-Module -Name $module -ListAvailable)) {
-        log "Installing module [$module]" -Verbose
-        $null = Install-Module -Name $module -Force -AllowClobber -Scope 'CurrentUser' -Repository 'PSGallery' -Confirm:$false
-        Import-Module $module -Force
-        log ("Installed versions of [$module]: [{0}]" -f ((Get-Module -Name $module -ListAvailable).Version -join ', '))
-    }
-}
-Set-PSRepository -Name 'PSGallery' -InstallationPolicy 'Untrusted'
 
 # export or re-import local administrator credential
 # we do this to support re-run of the template. If deployed, the HCI node password will be set to the password provided in the template, but future re-runs will generate a new password.
@@ -106,25 +88,24 @@ If (!(Test-Path -Path 'C:\temp\hciHostDeployAdminCred.xml')) {
     $adminCred | Export-Clixml -Path 'C:\temp\hciHostDeployAdminCred.xml'
 }
 
+If (!(Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+If (!(Get-PackageProvider -Name Nuget -ListAvailable -ErrorAction SilentlyContinue)) { Install-PackageProvider -Name NuGet -Confirm:$false -Force }
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+
+Install-Module Az
+
 # get an access token for the VM MSI, which has been granted rights and will be used for the HCI Arc Initialization
 log "Logging in to Azure with user-assigned managed identity '$($userAssignedManagedIdentityClientId)'..."
 Login-AzAccount -Identity -Subscription $subscriptionId -AccountId $userAssignedManagedIdentityClientId
 
 log 'Getting access token for Azure Stack HCI Arc initialization...'
-# Must use the below code as RunCommand is running with PowerShell 5.1, not core, where -AsPlainText is not supported
-# Var 1
-# $t = (Get-AzAccessToken -ResourceUrl 'https://management.azure.com' -AsSecureString).Token | ConvertFrom-SecureString -AsPlainText
-# Var 2
-# $accessToken = (Get-AzAccessToken -ResourceUrl 'https://management.azure.com' -AsSecureString).Token
-# $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($accessToken)
-# $t = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-# Var 3
 $t = Get-AzAccessToken -ResourceUrl 'https://management.azure.com' | Select-Object -ExpandProperty Token
 
 # pre-create AD objects
 log 'Pre-creating AD objects with deployment username '$deploymentUsername'...'
 $deployUserCred = [pscredential]::new($deploymentUsername, (ConvertTo-SecureString -AsPlainText -Force $adminPw))
 
+Install-Module AsHciADArtifactsPreCreationTool
 New-HciAdObjectsPreCreation -AzureStackLCMUserCredential $deployUserCred -AsHciOUName $domainOUPath
 
 ## set the LCM deployUser password to the adminPw value - this aligns the password with the KeyVault during re-runs
@@ -247,6 +228,13 @@ if (![string]::IsNullOrEmpty($proxyServerEndpoint) -and ![string]::IsNullOrEmpty
         $proxyServerEndpoint = $args[0]
         $proxyBypassString = $args[1]
 
+        ## install winInetProxy module
+        If (!(Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) { Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force }
+        If (!(Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+        If (!(Get-InstalledModule -Name WinInetProxy -ErrorAction SilentlyContinue)) { Install-Module WinInetProxy -Force }
+        Set-PSRepository -Name PSGallery -InstallationPolicy Untrusted
+
         ## set WinInet proxy settings
         Set-WinInetProxy -ProxyServer $proxyServerEndpoint -ProxyBypass $proxyBypassString -ProxySettingsPerUser 0
 
@@ -294,52 +282,56 @@ If (!$testNodeInternetConnection) {
 
 ## create jobs for each node to initialize Azure Arc
 log "Creating Azure Arc initialization jobs for HCI nodes [$((Get-VM).Name -join ',')]. ArcGatewayId: '$arcGatewayId', ProxyServerEndpoint: '$proxyServerEndpoint'..."
-$arcInitializationJobs = Get-VM | ForEach-Object {
-    Invoke-Command -VMName $_.Name -Credential $adminCred {
-        $ErrorActionPreference = 'Stop'
+$arcInitializationJobs = Invoke-Command -VMName (Get-VM).Name -Credential $adminCred {
+    $ErrorActionPreference = 'Stop'
 
-        $t = $args[0]
-        $subscriptionId = $args[1]
-        $resourceGroupName = $args[2]
-        $tenantId = $args[3]
-        $location = $args[4]
-        $accountName = $args[5]
-        $arcGatewayId = $args[6]
-        $proxyServerEndpoint = $args[7]
-        $proxyBypassString = $args[8]
+    $t = $args[0]
+    $subscriptionId = $args[1]
+    $resourceGroupName = $args[2]
+    $tenantId = $args[3]
+    $location = $args[4]
+    $accountName = $args[5]
+    $arcGatewayId = $args[6]
+    $proxyServerEndpoint = $args[7]
+    $proxyBypassString = $args[8]
 
-        $optionalParameters = @{}
+    $optionalParameters = @{}
 
-        If ($arcGatewayId) {
-            $optionalParameters += @{
-                'arcGatewayId' = $arcGatewayId
-            }
+    If ($arcGatewayId) {
+        $optionalParameters += @{
+            'arcGatewayId' = $arcGatewayId
         }
-        If ($proxyServerEndpoint) {
-            $optionalParameters += @{
-                'proxy'       = $proxyServerEndpoint
-                'proxyBypass' = $proxyBypassString
-            }
+    }
+    If ($proxyServerEndpoint) {
+        $optionalParameters += @{
+            'proxy'       = $proxyServerEndpoint
+            'proxyBypass' = $proxyBypassString
         }
+    }
 
-        #wait for bootstrap service to be reachable
-        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-        While (!(Test-NetConnection -ComputerName '127.0.0.1' -Port 9098 -InformationLevel Quiet) -and $stopwatch.Elapsed.TotalMinutes -lt 30) {
-            Write-Output 'Waiting for bootstrap service at 127.0.0.1:9098 to be reachable...'
-            Start-Sleep -Seconds 30
-        }
-        If ($stopwatch.Elapsed.TotalMinutes -ge 30) {
-            Write-Error 'Bootstrap service at 127.0.0.1:9098 did not become reachable within 30 minutes. Exiting...' -ErrorAction Stop
-        }
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+    If (!(Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+    Install-Module Az.Resources
+    Install-Module -Name AzsHCI.ARCinstaller # -RequiredVersion '0.2.2690.99' # hardcode for 2408 testing
+    Set-PSRepository -Name PSGallery -InstallationPolicy Untrusted
 
-        try {
-            Write-Output "[$($env:COMPUTERNAME)] Initializing Azure Arc on HCI node..."
-            Invoke-AzStackHciArcInitialization -SubscriptionID $subscriptionId -ResourceGroup $resourceGroupName -TenantID $tenantId -Cloud AzureCloud -AccountID $accountName -ArmAccessToken $t -Region $location -ErrorAction Stop @optionalParameters
-        } catch {
-            Write-Error $_ -ErrorAction Stop
-        }
-    } -AsJob -ArgumentList $t, $subscriptionId, $resourceGroupName, $tenantId, $location, $accountName, $arcGatewayId, $proxyServerEndpoint, $proxyBypassString
-}
+    #wait for bootstrap service to be reachable
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    While (!(Test-NetConnection -ComputerName '127.0.0.1' -Port 9098 -InformationLevel Quiet) -and $stopwatch.Elapsed.TotalMinutes -lt 30) {
+        Write-Host 'Waiting for bootstrap service at 127.0.0.1:9098 to be reachable...'
+        Start-Sleep -Seconds 30
+    }
+    If ($stopwatch.Elapsed.TotalMinutes -ge 30) {
+        Write-Error 'Bootstrap service at 127.0.0.1:9098 did not become reachable within 30 minutes. Exiting...' -ErrorAction Stop
+    }
+
+    try {
+        Invoke-AzStackHciArcInitialization -SubscriptionID $subscriptionId -ResourceGroup $resourceGroupName -TenantID $tenantId -Cloud AzureCloud -AccountID $accountName -ArmAccessToken $t -Region $location -ErrorAction Stop @optionalParameters
+    } catch {
+        Write-Error $_ -ErrorAction Stop
+    }
+} -AsJob -ArgumentList $t, $subscriptionId, $resourceGroupName, $tenantId, $location, $accountName, $arcGatewayId, $proxyServerEndpoint, $proxyBypassString
 
 log 'Waiting up to 30 minutes for Azure Arc initialization to complete on nodes...'
 
@@ -349,8 +341,8 @@ $arcInitializationJobs | Wait-Job -Timeout 1800
 log 'Checking status of Azure Arc initialization jobs...'
 $arcInitializationJobs | ForEach-Object {
     $job = $_
-    log "[$($job.Location)] Job output (Receive-Job): '$($job | Receive-Job -Keep -ErrorAction 'Continue' | Out-String)'"
-    Get-Job -Id $job.Id -IncludeChildJob | Receive-Job -ErrorAction 'SilentlyContinue' | ForEach-Object {
+    log "[$($job.ComputerName)] Job output (Receive-Job): '$($job | Receive-Job -Keep -ErrorAction Continue | Out-String)'"
+    Get-Job -Id $job.Id -IncludeChildJob | Receive-Job -ErrorAction SilentlyContinue | ForEach-Object {
         If ($_.Exception -or $_.state -eq 'Failed') {
             log "Azure Arc initialization failed on node '$($job.Location)' with error: $($_.Exception.Message)"
             Exit 1

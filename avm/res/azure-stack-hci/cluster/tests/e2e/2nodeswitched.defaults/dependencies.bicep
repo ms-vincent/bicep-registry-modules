@@ -1,95 +1,149 @@
-@description('Optional. The password of the LCM deployment user and local administrator accounts.')
+@minLength(4)
+@maxLength(8)
+param deploymentPrefix string
 @secure()
 param deploymentUserPassword string
-
-@description('Required. The password of the LCM deployment user and local administrator accounts.')
 @secure()
 param localAdminPassword string
-
-@description('Required. The app ID of the service principal used for the Azure Stack HCI Resource Bridge deployment. If omitted, the deploying user must have permissions to create service principals and role assignments in Entra ID.')
 @secure()
-param arbDeploymentAppId string
-
-@description('Required. The service principal ID of the service principal used for the Azure Stack HCI Resource Bridge deployment. If omitted, the deploying user must have permissions to create service principals and role assignments in Entra ID.')
+#disable-next-line secure-parameter-default
+param arbDeploymentAppId string = ''
 @secure()
-param arbDeploymentSPObjectId string
-
-@description('Required. The secret of the service principal used for the Azure Stack HCI Resource Bridge deployment. If omitted, the deploying user must have permissions to create service principals and role assignments in Entra ID.')
+#disable-next-line secure-parameter-default
+param arbDeploymentSPObjectId string = ''
 @secure()
-param arbDeploymentServicePrincipalSecret string
-
-@description('Required. The location to deploy the resources into.')
+param arbDeploymentServicePrincipalSecret string = ''
 param location string
-
-@description('Required. The name of the storage account to create as a cluster witness.')
+param softDeleteRetentionDays int = 30
+@minValue(0)
+@maxValue(365)
+param logsRetentionInDays int = 30
+param serviceShort string
 param clusterWitnessStorageAccountName string
-
-@description('Required. The name of the storage account to be created to collect Key Vault diagnostic logs.')
 param keyVaultDiagnosticStorageAccountName string
-
-@description('Required. The name of the Key Vault to create.')
 param keyVaultName string
+param customLocationName string
 
-@description('Required. The service principal ID of the Azure Stack HCI Resource Provider in this tenant.')
 @secure()
-param hciResourceProviderObjectId string
-
-@description('Required. The name of the Azure Stack HCI cluster.')
+#disable-next-line secure-parameter-default
+param hciResourceProviderObjectId string = ''
+param namePrefix string
 param clusterName string
 
-@description('Required. The name of the VM-managed user identity to create, used for HCI Arc onboarding.')
-param userAssignedIdentityName string
-
-@description('Conditional. The name of the VNET for the HCI host Azure VM. Required if \'vnetSubnetResourceId\' is empty.')
-param virtualNetworkName string
-
-@description('Required. The name of the maintenance configuration for the Azure Stack HCI Host VM and proxy server.')
-param maintenanceConfigurationName string
-
-@description('Conditional. The name of the Network Security Group ro create.')
-param networkSecurityGroupName string
-
-@description('Required. The name of the Azure VM scale set for the HCI host.')
-param HCIHostVirtualMachineScaleSetName string
-
-@description('Required. The name of the Network Interface Card to create.')
-param networkInterfaceName string
-
-@description('Required. The name prefix for the Disks to create.')
-param diskNamePrefix string
-
-@description('Required. The name of the Azure VM to create.')
-param virtualMachineName string
-
-@description('Required. The name of the Maintenance Configuration Assignment for the proxy server.')
-param maintenanceConfigurationAssignmentName string
-
-@description('Required. The name prefix for the \'wait\' deployment scripts to create.')
-param waitDeploymentScriptPrefixName string
-
+var deploymentUsername = 'deployUser'
+var localAdminUsername = 'admin-hci'
 var clusterNodeNames = ['hcinode1', 'hcinode2']
 var domainOUPath = 'OU=HCI,DC=hci,DC=local'
+var hciHostAssignPublicIp = false
+var domainFqdn = 'hci.local'
+var subnetMask = '255.255.255.0'
+var defaultGateway = '172.20.0.1'
+var startingIPAddress = '172.20.0.2'
+var endingIPAddress = '172.20.0.7'
+var dnsServers = ['172.20.0.1']
+var enableStorageAutoIp = true
+
+var hciISODownloadURL = 'https://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/OS-Composition/10.2408.0.3061/AZURESTACKHci23H2.25398.469.LCM.10.2408.0.3061.x64.en-us.iso'
+
+var networkIntents = [
+  {
+    adapter: ['mgmt']
+    name: 'management'
+    overrideAdapterProperty: true
+    adapterPropertyOverrides: {
+      jumboPacket: '9014'
+      networkDirect: 'Disabled'
+      networkDirectTechnology: 'iWARP'
+    }
+    overrideQosPolicy: false
+    qosPolicyOverrides: {
+      bandwidthPercentage_SMB: '50'
+      priorityValue8021Action_Cluster: '7'
+      priorityValue8021Action_SMB: '3'
+    }
+    overrideVirtualSwitchConfiguration: false
+    virtualSwitchConfigurationOverrides: {
+      enableIov: 'true'
+      loadBalancingAlgorithm: 'Dynamic'
+    }
+    trafficType: ['Management']
+  }
+  {
+    adapter: ['comp0', 'comp1']
+    name: 'compute'
+    overrideAdapterProperty: true
+    adapterPropertyOverrides: {
+      jumboPacket: '9014'
+      networkDirect: 'Disabled'
+      networkDirectTechnology: 'iWARP'
+    }
+    overrideQosPolicy: false
+    qosPolicyOverrides: {
+      bandwidthPercentage_SMB: '50'
+      priorityValue8021Action_Cluster: '7'
+      priorityValue8021Action_SMB: '3'
+    }
+    overrideVirtualSwitchConfiguration: false
+    virtualSwitchConfigurationOverrides: {
+      enableIov: 'true'
+      loadBalancingAlgorithm: 'Dynamic'
+    }
+    trafficType: ['Compute']
+  }
+  {
+    adapter: ['smb0', 'smb1']
+    name: 'storage'
+    overrideAdapterProperty: true
+    adapterPropertyOverrides: {
+      jumboPacket: '9014'
+      networkDirect: 'Disabled'
+      networkDirectTechnology: 'iWARP'
+    }
+    overrideQosPolicy: true
+    qosPolicyOverrides: {
+      bandwidthPercentage_SMB: '50'
+      priorityValue8021Action_Cluster: '7'
+      priorityValue8021Action_SMB: '3'
+    }
+    overrideVirtualSwitchConfiguration: false
+    virtualSwitchConfigurationOverrides: {
+      enableIov: 'true'
+      loadBalancingAlgorithm: 'Dynamic'
+    }
+    trafficType: ['Storage']
+  }
+]
+
+var storageNetworks = [
+  {
+    adapterName: 'smb0'
+    vlan: '711'
+  }
+  {
+    adapterName: 'smb1'
+    vlan: '712'
+  }
+]
+
+var arcNodeResourceIds = [
+  for (nodeName, index) in clusterNodeNames: resourceId('Microsoft.HybridCompute/machines', nodeName)
+]
+
+var tenantId = subscription().tenantId
 
 module hciHostDeployment '../../e2e-template-assets/azureStackHCIHost/hciHostDeployment.bicep' = {
-  name: '${uniqueString(deployment().name, location)}-test-hcihostdeploy'
+  name: '${uniqueString(deployment().name, location)}-test-hcihostdeploy-${location}-${serviceShort}${namePrefix}'
   params: {
+    hciHostAssignPublicIp: hciHostAssignPublicIp
     domainOUPath: domainOUPath
-    hciISODownloadURL: 'https://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/OS-Composition/10.2408.0.3061/AZURESTACKHci23H2.25398.469.LCM.10.2408.0.3061.x64.en-us.iso'
+    deployProxy: false
+    hciISODownloadURL: hciISODownloadURL
     hciNodeCount: length(clusterNodeNames)
     hostVMSize: 'Standard_E16bds_v5'
     localAdminPassword: localAdminPassword
     location: location
     switchlessStorageConfig: false
-    diskNamePrefix: diskNamePrefix
-    HCIHostVirtualMachineScaleSetName: HCIHostVirtualMachineScaleSetName
-    networkSecurityGroupName: networkSecurityGroupName
-    maintenanceConfigurationAssignmentName: maintenanceConfigurationAssignmentName
-    maintenanceConfigurationName: maintenanceConfigurationName
-    networkInterfaceName: networkInterfaceName
-    userAssignedIdentityName: userAssignedIdentityName
-    virtualMachineName: virtualMachineName
-    waitDeploymentScriptPrefixName: waitDeploymentScriptPrefixName
-    virtualNetworkName: virtualNetworkName
+    namingPrefix: 'dep-${serviceShort}${namePrefix}'
   }
 }
 
@@ -104,43 +158,47 @@ resource cluster 'Microsoft.AzureStackHCI/clusters@2024-04-01' = {
 }
 
 module hciClusterPreqs '../../e2e-template-assets/azureStackHCIClusterPreqs/ashciPrereqs.bicep' = {
-  name: '${uniqueString(deployment().name, location)}-test-hciclusterreqs'
+  dependsOn: [
+    hciHostDeployment
+  ]
+  name: '${uniqueString(deployment().name, location)}-test-hciclusterreqs-${serviceShort}${namePrefix}'
   params: {
     location: location
     arbDeploymentAppId: arbDeploymentAppId
     arbDeploymentServicePrincipalSecret: arbDeploymentServicePrincipalSecret
     arbDeploymentSPObjectId: arbDeploymentSPObjectId
-    arcNodeResourceIds: [
-      for (nodeName, index) in ['hcinode1', 'hcinode2']: resourceId('Microsoft.HybridCompute/machines', nodeName)
-    ]
+    arcNodeResourceIds: arcNodeResourceIds
     clusterWitnessStorageAccountName: clusterWitnessStorageAccountName
     keyVaultDiagnosticStorageAccountName: keyVaultDiagnosticStorageAccountName
-    deploymentUsername: 'deployUser'
+    deploymentUsername: deploymentUsername
     deploymentUserPassword: deploymentUserPassword
     hciResourceProviderObjectId: hciResourceProviderObjectId
     keyVaultName: keyVaultName
     localAdminPassword: localAdminPassword
-    localAdminUsername: 'admin-hci'
-    logsRetentionInDays: 30
-    softDeleteRetentionDays: 30
-    tenantId: subscription().tenantId
-    vnetSubnetResourceId: hciHostDeployment.outputs.vnetSubnetResourceId
+    localAdminUsername: localAdminUsername
+    logsRetentionInDays: logsRetentionInDays
+    softDeleteRetentionDays: softDeleteRetentionDays
+    tenantId: tenantId
+    vnetSubnetId: hciHostDeployment.outputs.vnetSubnetId
     clusterName: clusterName
     cloudId: cluster.properties.cloudId
   }
 }
 
-@description('The name of the created cluster')
-output clusterName string = cluster.name
-
-@description('The name of the cluster\'s nodes.')
+output cluster object = cluster
+output clusterName string = clusterName
 output clusterNodeNames array = clusterNodeNames
-
-@description('The name of the storage account used as the cluster witness.')
 output clusterWitnessStorageAccountName string = clusterWitnessStorageAccountName
-
-@description('The OU path for the domain.')
+output customLocationName string = customLocationName
+output defaultGateway string = defaultGateway
+output dnsServers array = dnsServers
+output domainFqdn string = domainFqdn
 output domainOUPath string = domainOUPath
-
-@description('The name of the created Key Vault.')
+output enableStorageAutoIp bool = enableStorageAutoIp
+output endingIPAddress string = endingIPAddress
+output hciClusterPreqs object = hciClusterPreqs
 output keyVaultName string = keyVaultName
+output networkIntents array = networkIntents
+output startingIPAddress string = startingIPAddress
+output storageNetworks array = storageNetworks
+output subnetMask string = subnetMask

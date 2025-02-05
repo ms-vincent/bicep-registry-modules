@@ -1,44 +1,23 @@
 param location string // all resource except HCI Arc Nodes + HCI resources
+param vnetSubnetID string? // use to connect the HCI Azure Host VM to an existing VNET in the same region
+param useSpotVM bool = false // change to false to use regular priority VM
 param hostVMSize string = 'Standard_E32bds_v5' // Azure VM size for the HCI Host VM - must support nested virtualization and have sufficient capacity for the HCI node VMs!
 param hciNodeCount int = 2 // number of Azure Stack HCI nodes to deploy
 param switchlessStorageConfig bool = false // set to true to configure switchless storage
 // specify either a VHDX or ISO download URL; if both are specified, the VHDX download URL will be used
+param hciVHDXDownloadURL string = ''
 param hciISODownloadURL string = 'https://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/OS-Composition/10.2408.0.3061/AZURESTACKHci23H2.25398.469.LCM.10.2408.0.3061.x64.en-us.iso'
 param localAdminUsername string = 'admin-hci'
 @secure()
 param localAdminPassword string
 param domainOUPath string = 'OU=HCI,DC=HCI,DC=local'
 param deploymentUsername string = 'deployUser'
-
-@description('Required. The name of the VM-managed user identity to create, used for HCI Arc onboarding.')
-param userAssignedIdentityName string
-
-@description('Required. The name of the VNET for the HCI host Azure VM.')
-param virtualNetworkName string
-
-@description('Required. The name of the NSG to create.')
-param networkSecurityGroupName string
-
-@description('Required. The name of the maintenance configuration for the Azure Stack HCI Host VM and proxy server.')
-param maintenanceConfigurationName string
-
-@description('Required. The name of the Azure VM scale set for the HCI host.')
-param HCIHostVirtualMachineScaleSetName string
-
-@description('Required. The name of the Network Interface Card to create.')
-param networkInterfaceName string
-
-@description('Required. The name prefix for the Disks to create.')
-param diskNamePrefix string
-
-@description('Required. The name of the Azure VM to create.')
-param virtualMachineName string
-
-@description('Required. The name of the Maintenance Configuration Assignment for the proxy server.')
-param maintenanceConfigurationAssignmentName string
-
-@description('Required. The name prefix for the \'wait\' deployment scripts to create.')
-param waitDeploymentScriptPrefixName string
+param arcGatewayId string = '' // default to '' to support runCommand parameters requiring string values
+param deployProxy bool = false // set to true to deploy a proxy VM for hci internet access
+param proxyBypassString string? // bypass string for proxy server - deployProxy must be true
+param proxyServerEndpoint string? // endpoint for proxy server - deployProxy must be true
+param hciHostAssignPublicIp bool = false // set to true to deploy a public IP for the HCI Host VM
+param namingPrefix string // combination of 'dep-', {serviceShort} and {namePrefix} from AVM E2E tests
 
 // =================================//
 // Deploy Host VM Infrastructure    //
@@ -47,23 +26,23 @@ param waitDeploymentScriptPrefixName string
 // vm managed identity used for HCI Arc onboarding
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview' = {
   location: location
-  name: userAssignedIdentityName
+  name: '${namingPrefix}hciHost01Identity'
 }
 
 // grant identity owner permissions on the resource group
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(subscription().subscriptionId, userAssignedIdentity.name, 'Owner', resourceGroup().id)
+  name: guid(subscription().subscriptionId, userAssignedIdentity.name, 'Owner', resourceGroup().id, namingPrefix)
   properties: {
     principalId: userAssignedIdentity.properties.principalId
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635') // Owner
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635')
     principalType: 'ServicePrincipal'
-    description: 'Role assigned used for Azure Stack HCI IaC testing pipeline - remove if identity no longer exists!'
+    description: '${namingPrefix} Role assigned used for Azure Stack HCI IaC testing pipeline - remove if identity no longer exists!'
   }
 }
 
 // grant identity contributor permissions on the subscription - needed to register resource providers
 module roleAssignment_subscriptionContributor 'modules/subscriptionRoleAssignment.bicep' = {
-  name: '${uniqueString(deployment().name, location)}-hcihostmi-roleAssignment_subContributor'
+  name: '${namingPrefix}-hcihostmi-roleAssignment_subContributor'
   scope: subscription()
   params: {
     principalId: userAssignedIdentity.properties.principalId
@@ -71,8 +50,8 @@ module roleAssignment_subscriptionContributor 'modules/subscriptionRoleAssignmen
 }
 
 // optional VNET and subnet for the HCI host Azure VM
-resource vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
-  name: virtualNetworkName
+resource vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = if (empty(vnetSubnetID)) {
+  name: '${namingPrefix}vnet01'
   location: location
   properties: {
     addressSpace: {
@@ -102,7 +81,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-11-01' = {
 // create a mintenance configuration for the Azure Stack HCI Host VM and proxy server
 resource maintenanceConfig 'Microsoft.Maintenance/maintenanceConfigurations@2023-09-01-preview' = {
   location: location
-  name: maintenanceConfigurationName
+  name: '${namingPrefix}maintenanceConfig01'
   properties: {
     maintenanceScope: 'InGuestPatch'
     maintenanceWindow: {
@@ -123,13 +102,114 @@ resource maintenanceConfig 'Microsoft.Maintenance/maintenanceConfigurations@2023
   }
 }
 
-resource networkSecurityGroup 'Microsoft.Network/networkSecurityGroups@2020-11-01' = {
+resource proxyVMSSFlex 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' = if (deployProxy) {
+  name: '${namingPrefix}vmss-proxy01'
   location: location
-  name: networkSecurityGroupName
+  zones: ['1', '2', '3']
+  properties: {
+    orchestrationMode: 'Flexible'
+    platformFaultDomainCount: 1
+  }
+}
+
+resource proxyNic 'Microsoft.Network/networkInterfaces@2023-11-01' = if (deployProxy) {
+  name: '${namingPrefix}proxyNic01'
+  location: location
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'ipconfig1'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: vnetSubnetID ?? vnet.properties.subnets[0].id
+          }
+        }
+      }
+    ]
+  }
+}
+
+resource proxyServer 'Microsoft.Compute/virtualMachines@2024-03-01' = if (deployProxy) {
+  name: '${namingPrefix}proxyServer01'
+  location: location
+  zones: ['1']
+  properties: {
+    virtualMachineScaleSet: {
+      id: proxyVMSSFlex.id
+    }
+    hardwareProfile: {
+      vmSize: 'Standard_D2s_v3'
+    }
+    storageProfile: {
+      imageReference: {
+        publisher: 'Canonical'
+        offer: '0001-com-ubuntu-server-jammy'
+        sku: '22_04-lts-gen2'
+        version: 'latest'
+      }
+      osDisk: {
+        createOption: 'FromImage'
+        managedDisk: {
+          storageAccountType: 'Premium_ZRS'
+        }
+      }
+    }
+    osProfile: {
+      computerName: 'proxyServer'
+      adminUsername: localAdminUsername
+      adminPassword: localAdminPassword
+      customData: (arcGatewayId == null || arcGatewayId == '')
+        ? base64(loadTextContent('./scripts/proxyConfig.sh'))
+        : base64(loadTextContent('./scripts/proxyConfigArcGW.sh'))
+      linuxConfiguration: {
+        disablePasswordAuthentication: false
+        patchSettings: {
+          patchMode: 'AutomaticByPlatform'
+          automaticByPlatformSettings: {
+            bypassPlatformSafetyChecksOnUserSchedule: true
+          }
+        }
+      }
+    }
+
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: proxyNic.id
+        }
+      ]
+    }
+  }
+}
+
+resource maintenanceAssignment_proxyServer 'Microsoft.Maintenance/configurationAssignments@2023-04-01' = if (deployProxy) {
+  location: location
+  name: '${namingPrefix}maintenanceAssignment01'
+  properties: {
+    maintenanceConfigurationId: maintenanceConfig.id
+  }
+  scope: proxyServer
+}
+
+resource publicIP_HCIHost 'Microsoft.Network/publicIPAddresses@2024-01-01' = if (hciHostAssignPublicIp) {
+  name: '${namingPrefix}pip-hcihost01'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+resource networkSecurityGroup_HCIHost 'Microsoft.Network/networkSecurityGroups@2020-11-01' = {
+  location: location
+  name: '${namingPrefix}hciHostNSG'
 }
 
 resource hciHostVMSSFlex 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' = {
-  name: HCIHostVirtualMachineScaleSetName
+  name: '${namingPrefix}vmss-hcihost01'
   location: location
   zones: ['1', '2', '3']
   properties: {
@@ -140,19 +220,24 @@ resource hciHostVMSSFlex 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' 
 
 resource nic 'Microsoft.Network/networkInterfaces@2020-11-01' = {
   location: location
-  name: networkInterfaceName
+  name: '${namingPrefix}nic01'
   properties: {
     networkSecurityGroup: {
-      id: networkSecurityGroup.id
+      id: networkSecurityGroup_HCIHost.id
     }
     ipConfigurations: [
       {
         name: 'ipConfig01'
         properties: {
           subnet: {
-            id: vnet.properties.subnets[0].id
+            id: vnetSubnetID ?? vnet.properties.subnets[0].id
           }
           privateIPAllocationMethod: 'Dynamic'
+          publicIPAddress: hciHostAssignPublicIp
+            ? {
+                id: publicIP_HCIHost.id
+              }
+            : null
         }
       }
     ]
@@ -162,7 +247,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2020-11-01' = {
 // host VM disks
 resource disks 'Microsoft.Compute/disks@2023-10-02' = [
   for diskNum in range(1, hciNodeCount): {
-    name: '${diskNamePrefix}${string(diskNum)}'
+    name: '${namingPrefix}dataDisk${string(diskNum)}'
     location: location
     zones: ['1']
     sku: {
@@ -181,7 +266,7 @@ resource disks 'Microsoft.Compute/disks@2023-10-02' = [
 // Azure Stack HCI Host VM -
 resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   location: location
-  name: virtualMachineName
+  name: '${namingPrefix}hciHost01'
   zones: ['1']
   identity: {
     type: 'UserAssigned'
@@ -196,7 +281,13 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
     hardwareProfile: {
       vmSize: hostVMSize
     }
-    priority: 'Regular'
+    priority: useSpotVM ? 'Spot' : 'Regular'
+    evictionPolicy: useSpotVM ? 'Deallocate' : null
+    billingProfile: useSpotVM
+      ? {
+          maxPrice: -1
+        }
+      : null
     networkProfile: {
       networkInterfaces: [
         {
@@ -230,11 +321,12 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
           deleteOption: 'Delete'
         }
       ]
+      //diskControllerType: 'NVMe'
     }
     osProfile: {
       adminPassword: localAdminPassword
       adminUsername: localAdminUsername
-      computerName: virtualMachineName
+      computerName: 'hciHost01'
       windowsConfiguration: {
         provisionVMAgent: true
         enableAutomaticUpdates: true
@@ -259,7 +351,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
 
 resource maintenanceAssignment_hciHost 'Microsoft.Maintenance/configurationAssignments@2023-04-01' = {
   location: location
-  name: maintenanceConfigurationAssignmentName
+  name: '${namingPrefix}maintenanceAssignmentHciHost'
   properties: {
     maintenanceConfigurationId: maintenanceConfig.id
   }
@@ -270,24 +362,11 @@ resource maintenanceAssignment_hciHost 'Microsoft.Maintenance/configurationAssig
 // Install Host Roles  //
 // ====================//
 
-// installs required modules
-resource runCommand0 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
-  parent: vm
-  location: location
-  name: 'runCommand0'
-  properties: {
-    source: {
-      script: loadTextContent('./scripts/hciHostStage0.ps1')
-    }
-    treatFailureAsDeploymentFailure: true
-  }
-}
-
 // installs roles and features required for Azure Stack HCI Host VM
 resource runCommand1 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand1'
+  name: '${namingPrefix}runCommand1'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage1.ps1')
@@ -300,7 +379,7 @@ resource runCommand1 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource runCommand2 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand2'
+  name: '${namingPrefix}runCommand2'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage2.ps1')
@@ -314,7 +393,7 @@ resource runCommand2 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource wait1 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   location: location
   kind: 'AzurePowerShell'
-  name: '${waitDeploymentScriptPrefixName}-wait1'
+  name: '${namingPrefix}wait1'
   properties: {
     azPowerShellVersion: '3.0'
     scriptContent: 'Start-Sleep -Seconds 90'
@@ -331,12 +410,16 @@ resource wait1 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
 resource runCommand3 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand3'
+  name: '${namingPrefix}runCommand3'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage3.ps1')
     }
     parameters: [
+      {
+        name: 'hciVHDXDownloadURL'
+        value: hciVHDXDownloadURL
+      }
       {
         name: 'hciISODownloadURL'
         value: hciISODownloadURL
@@ -355,7 +438,7 @@ resource runCommand3 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource runCommand4 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand4'
+  name: '${namingPrefix}runCommand4'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage4.ps1')
@@ -369,13 +452,14 @@ resource runCommand4 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource wait2 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   location: location
   kind: 'AzurePowerShell'
-  name: '${waitDeploymentScriptPrefixName}-wait2'
+  name: '${namingPrefix}wait2'
   properties: {
     azPowerShellVersion: '3.0'
     scriptContent: 'Start-Sleep -Seconds 300 #enough time for AD start-up'
     retentionInterval: 'PT6H'
   }
   dependsOn: [
+    proxyServer
     runCommand4
   ]
 }
@@ -388,7 +472,7 @@ resource wait2 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
 resource runCommand5 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand5'
+  name: '${namingPrefix}runCommand5'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage5.ps1')
@@ -426,7 +510,7 @@ resource runCommand5 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource runCommand6 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand6'
+  name: '${namingPrefix}runCommand6'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage6.ps1')
@@ -458,7 +542,7 @@ resource runCommand6 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
       }
       {
         name: 'arcGatewayId'
-        value: ''
+        value: arcGatewayId
       }
       {
         name: 'deploymentUsername'
@@ -470,11 +554,13 @@ resource runCommand6 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
       }
       {
         name: 'proxyBypassString'
-        value: ''
+        value: proxyBypassString ?? (deployProxy ? 'GENERATE_PROXY_BYPASS_DYNAMICALLY' : '')
       }
       {
         name: 'proxyServerEndpoint'
-        value: ''
+        value: proxyServerEndpoint ?? (deployProxy
+          ? 'http://${proxyNic.properties.ipConfigurations[0].properties.privateIPAddress}:3128'
+          : '')
       }
       {
         name: 'userAssignedManagedIdentityClientId'
@@ -496,7 +582,7 @@ resource runCommand6 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
 resource runCommand7 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' = {
   parent: vm
   location: location
-  name: 'runCommand7'
+  name: '${namingPrefix}runCommand7'
   properties: {
     source: {
       script: loadTextContent('./scripts/hciHostStage7.ps1')
@@ -524,4 +610,4 @@ resource runCommand7 'Microsoft.Compute/virtualMachines/runCommands@2024-03-01' 
   dependsOn: [runCommand6]
 }
 
-output vnetSubnetResourceId string = vnet.properties.subnets[0].id
+output vnetSubnetId string = vnetSubnetID ?? vnet.properties.subnets[0].id
