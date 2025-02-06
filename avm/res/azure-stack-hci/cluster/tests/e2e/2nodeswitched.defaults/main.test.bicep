@@ -58,7 +58,6 @@ module hciDependencies 'dependencies.bicep' = {
     clusterName: name
     clusterWitnessStorageAccountName: 'dep${namePrefix}${serviceShort}wit'
     customLocationName: 'dep-${namePrefix}${serviceShort}-location'
-    deploymentPrefix: deploymentPrefix
     deploymentUserPassword: localAdminAndDeploymentUserPass
     hciResourceProviderObjectId: hciResourceProviderObjectId
     keyVaultDiagnosticStorageAccountName: 'dep${take('${deploymentPrefix}${serviceShort}${take(uniqueString(resourceGroup.name,resourceGroup.location),6)}',17)}kvd'
@@ -79,19 +78,95 @@ module testDeployment '../../../main.bicep' = {
       customLocationName: hciDependencies.outputs.customLocationName
       clusterNodeNames: hciDependencies.outputs.clusterNodeNames
       clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
-      defaultGateway: hciDependencies.outputs.defaultGateway
+      defaultGateway: '172.20.0.1'
       deploymentPrefix: deploymentPrefix
-      dnsServers: hciDependencies.outputs.dnsServers
-      domainFqdn: hciDependencies.outputs.domainFqdn
+      dnsServers: ['172.20.0.1']
+      domainFqdn: 'hci.local'
       domainOUPath: hciDependencies.outputs.domainOUPath
-      endingIPAddress: hciDependencies.outputs.endingIPAddress
-      enableStorageAutoIp: hciDependencies.outputs.enableStorageAutoIp
+      endingIPAddress: '172.20.0.7'
+      enableStorageAutoIp: true
       keyVaultName: hciDependencies.outputs.keyVaultName
-      networkIntents: hciDependencies.outputs.networkIntents
-      startingIPAddress: hciDependencies.outputs.startingIPAddress
+      networkIntents: [
+        {
+          adapter: ['mgmt']
+          name: 'management'
+          overrideAdapterProperty: true
+          adapterPropertyOverrides: {
+            jumboPacket: '9014'
+            networkDirect: 'Disabled'
+            networkDirectTechnology: 'iWARP'
+          }
+          overrideQosPolicy: false
+          qosPolicyOverrides: {
+            bandwidthPercentage_SMB: '50'
+            priorityValue8021Action_Cluster: '7'
+            priorityValue8021Action_SMB: '3'
+          }
+          overrideVirtualSwitchConfiguration: false
+          virtualSwitchConfigurationOverrides: {
+            enableIov: 'true'
+            loadBalancingAlgorithm: 'Dynamic'
+          }
+          trafficType: ['Management']
+        }
+        {
+          adapter: ['comp0', 'comp1']
+          name: 'compute'
+          overrideAdapterProperty: true
+          adapterPropertyOverrides: {
+            jumboPacket: '9014'
+            networkDirect: 'Disabled'
+            networkDirectTechnology: 'iWARP'
+          }
+          overrideQosPolicy: false
+          qosPolicyOverrides: {
+            bandwidthPercentage_SMB: '50'
+            priorityValue8021Action_Cluster: '7'
+            priorityValue8021Action_SMB: '3'
+          }
+          overrideVirtualSwitchConfiguration: false
+          virtualSwitchConfigurationOverrides: {
+            enableIov: 'true'
+            loadBalancingAlgorithm: 'Dynamic'
+          }
+          trafficType: ['Compute']
+        }
+        {
+          adapter: ['smb0', 'smb1']
+          name: 'storage'
+          overrideAdapterProperty: true
+          adapterPropertyOverrides: {
+            jumboPacket: '9014'
+            networkDirect: 'Disabled'
+            networkDirectTechnology: 'iWARP'
+          }
+          overrideQosPolicy: true
+          qosPolicyOverrides: {
+            bandwidthPercentage_SMB: '50'
+            priorityValue8021Action_Cluster: '7'
+            priorityValue8021Action_SMB: '3'
+          }
+          overrideVirtualSwitchConfiguration: false
+          virtualSwitchConfigurationOverrides: {
+            enableIov: 'true'
+            loadBalancingAlgorithm: 'Dynamic'
+          }
+          trafficType: ['Storage']
+        }
+      ]
+      startingIPAddress: '172.20.0.2'
       storageConnectivitySwitchless: false
-      storageNetworks: hciDependencies.outputs.storageNetworks
-      subnetMask: hciDependencies.outputs.subnetMask
+      storageNetworks: [
+        {
+          adapterName: 'smb0'
+          vlan: '711'
+        }
+        {
+          adapterName: 'smb1'
+          vlan: '712'
+        }
+      ]
+      subnetMask: '255.255.255.0'
     }
   }
 }
