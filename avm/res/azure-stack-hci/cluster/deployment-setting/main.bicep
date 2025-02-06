@@ -1,23 +1,21 @@
 metadata name = 'Azure Stack HCI Cluster Deployment Settings'
 metadata description = 'This module deploys an Azure Stack HCI Cluster Deployment Settings resource.'
-metadata owner = 'Azure/module-maintainers'
+
+@description('Optional. The name of the deployment settings.')
+@allowed([
+  'default'
+])
+param name string = 'default'
 
 @description('Conditional. The name of the Azure Stack HCI cluster - this must be a valid Active Directory computer name and will be the name of your cluster in Azure. Required if the template is used in a standalone deployment.')
 @maxLength(15)
 @minLength(4)
 param clusterName string
 
-@description('Optional. Location for all resources.')
-param location string = resourceGroup().location
-
-@sys.description('Optional. Tags of the resource.')
-param tags object?
-
 @description('Required. First must pass with this parameter set to Validate prior running with it set to Deploy. If either Validation or Deployment phases fail, fix the issue, then resubmit the template with the same deploymentMode to retry.')
 @allowed([
   'Validate'
   'Deploy'
-  'None'
 ])
 param deploymentMode string
 
@@ -35,19 +33,35 @@ param domainFqdn string
 @description('Required. The ADDS OU path - ex "OU=HCI,DC=contoso,DC=com".')
 param domainOUPath string
 
-@description('Optional. Security configuration settings object; defaults to most secure posture.')
-param securityConfiguration object = {
-  hvciProtection: true
-  drtmProtection: true
-  driftControlEnforced: true
-  credentialGuardEnforced: true
-  smbSigningEnforced: true
-  smbClusterEncryption: true
-  sideChannelMitigationEnforced: true
-  bitlockerBootVolume: true
-  bitlockerDataVolumes: true
-  wdacEnforced: true
-}
+@description('Optional. The Hypervisor-protected Code Integrity setting.')
+param hvciProtection bool = true
+
+@description('Optional. The hardware-dependent Secure Boot setting.')
+param drtmProtection bool = true
+
+@description('Optional. When set to true, the security baseline is re-applied regularly.')
+param driftControlEnforced bool = true
+
+@description('Optional. Enables the Credential Guard.')
+param credentialGuardEnforced bool = true
+
+@description('Optional. When set to true, the SMB default instance requires sign in for the client and server services.')
+param smbSigningEnforced bool = true
+
+@description('Optional. When set to true, cluster east-west traffic is encrypted.')
+param smbClusterEncryption bool = true
+
+@description('Optional. When set to true, all the side channel mitigations are enabled.')
+param sideChannelMitigationEnforced bool = true
+
+@description('Optional. When set to true, BitLocker XTS_AES 256-bit encryption is enabled for all data-at-rest on the OS volume of your Azure Stack HCI cluster. This setting is TPM-hardware dependent.')
+param bitlockerBootVolume bool = true
+
+@description('Optional. When set to true, BitLocker XTS-AES 256-bit encryption is enabled for all data-at-rest on your Azure Stack HCI cluster shared volumes.')
+param bitlockerDataVolumes bool = true
+
+@description('Optional. Limits the applications and the code that you can run on your Azure Stack HCI cluster.')
+param wdacEnforced bool = true
 
 // cluster diagnostics and telemetry configuration
 @description('Optional. The metrics data for deploying a HCI cluster.')
@@ -109,32 +123,16 @@ param keyVaultName string
 @description('Optional. If using a shared key vault or non-legacy secret naming, pass the properties.cloudId guid from the pre-created HCI cluster resource.')
 param cloudId string?
 
-var deploymentSecretEceNames = [
-  'LocalAdminCredential'
-  'AzureStackLCMUserCredential'
-  'DefaultARBApplication'
-  'WitnessStorageKey'
-]
-
 var arcNodeResourceIds = [
   for (nodeName, index) in clusterNodeNames: resourceId('Microsoft.HybridCompute/machines', nodeName)
-]
-
-var storageNetworkList = [
-  for (storageAdapter, index) in storageNetworks: {
-    name: 'StorageNetwork${index + 1}'
-    networkAdapterName: storageAdapter.adapterName
-    vlanId: storageAdapter.vlan
-    storageAdapterIPInfo: storageAdapter.?storageAdapterIPInfo
-  }
 ]
 
 resource cluster 'Microsoft.AzureStackHCI/clusters@2024-04-01' existing = {
   name: clusterName
 }
 
-resource deploymentSettings 'Microsoft.AzureStackHCI/clusters/deploymentSettings@2024-04-01' = if (deploymentMode != 'None') {
-  name: 'default'
+resource deploymentSettings 'Microsoft.AzureStackHCI/clusters/deploymentSettings@2024-04-01' = {
+  name: name
   parent: cluster
   properties: {
     arcNodeResourceIds: arcNodeResourceIds
@@ -145,16 +143,16 @@ resource deploymentSettings 'Microsoft.AzureStackHCI/clusters/deploymentSettings
         {
           deploymentData: {
             securitySettings: {
-              hvciProtection: securityConfiguration.hvciProtection
-              drtmProtection: securityConfiguration.drtmProtection
-              driftControlEnforced: securityConfiguration.driftControlEnforced
-              credentialGuardEnforced: securityConfiguration.credentialGuardEnforced
-              smbSigningEnforced: securityConfiguration.smbSigningEnforced
-              smbClusterEncryption: securityConfiguration.smbClusterEncryption
-              sideChannelMitigationEnforced: securityConfiguration.sideChannelMitigationEnforced
-              bitlockerBootVolume: securityConfiguration.bitlockerBootVolume
-              bitlockerDataVolumes: securityConfiguration.bitlockerDataVolumes
-              wdacEnforced: securityConfiguration.wdacEnforced
+              hvciProtection: hvciProtection
+              drtmProtection: drtmProtection
+              driftControlEnforced: driftControlEnforced
+              credentialGuardEnforced: credentialGuardEnforced
+              smbSigningEnforced: smbSigningEnforced
+              smbClusterEncryption: smbClusterEncryption
+              sideChannelMitigationEnforced: sideChannelMitigationEnforced
+              bitlockerBootVolume: bitlockerBootVolume
+              bitlockerDataVolumes: bitlockerDataVolumes
+              wdacEnforced: wdacEnforced
             }
             observability: {
               streamingDataClient: streamingDataClient
@@ -202,7 +200,14 @@ resource deploymentSettings 'Microsoft.AzureStackHCI/clusters/deploymentSettings
             hostNetwork: {
               intents: networkIntents
               storageConnectivitySwitchless: storageConnectivitySwitchless
-              storageNetworks: storageNetworkList
+              storageNetworks: [
+                for (storageAdapter, index) in storageNetworks: {
+                  name: 'StorageNetwork${index + 1}'
+                  networkAdapterName: storageAdapter.adapterName
+                  vlanId: storageAdapter.vlan
+                  storageAdapterIPInfo: storageAdapter.?storageAdapterIPInfo
+                }
+              ]
               enableStorageAutoIp: enableStorageAutoIp
             }
             adouPath: domainOUPath
@@ -211,7 +216,12 @@ resource deploymentSettings 'Microsoft.AzureStackHCI/clusters/deploymentSettings
               customLocation: customLocationName
             }
             secrets: [
-              for secretName in deploymentSecretEceNames: {
+              for secretName in [
+                'LocalAdminCredential'
+                'AzureStackLCMUserCredential'
+                'DefaultARBApplication'
+                'WitnessStorageKey'
+              ]: {
                 secretName: empty(cloudId) ? secretName : '${clusterName}-${secretName}-${cloudId}'
                 eceSecretName: secretName
                 secretLocation: empty(cloudId)

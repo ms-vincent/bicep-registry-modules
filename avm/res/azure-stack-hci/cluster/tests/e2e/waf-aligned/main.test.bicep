@@ -3,9 +3,6 @@ targetScope = 'subscription'
 metadata name = 'Deploy Azure Stack HCI Cluster in Azure with a 2 node switched configuration WAF aligned'
 metadata description = 'This test deploys an Azure VM to host a 2 node switched Azure Stack HCI cluster, validates the cluster configuration, and then deploys the cluster WAF aligned.'
 
-@description('Optional. Location for all resources.')
-param location string = deployment().location
-
 @description('Optional. The name of the resource group to deploy for testing purposes.')
 @maxLength(90)
 param resourceGroupName string = 'dep-azure-stack-hci.cluster-${serviceShort}-rg'
@@ -78,21 +75,23 @@ module testDeployment '../../../main.bicep' = {
   scope: resourceGroup
   params: {
     name: name
-    customLocationName: hciDependencies.outputs.customLocationName
-    clusterNodeNames: hciDependencies.outputs.clusterNodeNames
-    clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
-    defaultGateway: hciDependencies.outputs.defaultGateway
-    deploymentPrefix: deploymentPrefix
-    dnsServers: hciDependencies.outputs.dnsServers
-    domainFqdn: hciDependencies.outputs.domainFqdn
-    domainOUPath: hciDependencies.outputs.domainOUPath
-    endingIPAddress: hciDependencies.outputs.endingIPAddress
-    enableStorageAutoIp: hciDependencies.outputs.enableStorageAutoIp
-    keyVaultName: hciDependencies.outputs.keyVaultName
-    networkIntents: hciDependencies.outputs.networkIntents
-    startingIPAddress: hciDependencies.outputs.startingIPAddress
-    storageConnectivitySwitchless: false
-    storageNetworks: hciDependencies.outputs.storageNetworks
-    subnetMask: hciDependencies.outputs.subnetMask
+    deploymentSettings: {
+      customLocationName: hciDependencies.outputs.customLocationName
+      clusterNodeNames: hciDependencies.outputs.clusterNodeNames
+      clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
+      defaultGateway: hciDependencies.outputs.defaultGateway
+      deploymentPrefix: deploymentPrefix
+      dnsServers: hciDependencies.outputs.dnsServers
+      domainFqdn: hciDependencies.outputs.domainFqdn
+      domainOUPath: hciDependencies.outputs.domainOUPath
+      endingIPAddress: hciDependencies.outputs.endingIPAddress
+      enableStorageAutoIp: hciDependencies.outputs.enableStorageAutoIp
+      keyVaultName: hciDependencies.outputs.keyVaultName
+      networkIntents: hciDependencies.outputs.networkIntents
+      startingIPAddress: hciDependencies.outputs.startingIPAddress
+      storageConnectivitySwitchless: false
+      storageNetworks: hciDependencies.outputs.storageNetworks
+      subnetMask: hciDependencies.outputs.subnetMask
+    }
   }
 }

@@ -3,12 +3,9 @@ targetScope = 'subscription'
 metadata name = 'Deploy Azure Stack HCI Cluster in Azure with a 2 node switched configuration'
 metadata description = 'This test deploys an Azure VM to host a 2 node switched Azure Stack HCI cluster, validates the cluster configuration, and then deploys the cluster.'
 
-@description('Optional. Location for all resources.')
-param location string = deployment().location
-
 @description('Optional. The name of the resource group to deploy for testing purposes.')
 @maxLength(90)
-param resourceGroupName string = 'dep-azure-stack-hci.cluster-${serviceShort}-rg'
+param resourceGroupName string = 'dep-azure-stack-hci.cluster-${serviceShort}-rg' // TODO: Add namePrefix
 
 @description('Optional. A short identifier for the kind of deployment. Should be kept short to not run into resource-name length-constraints.')
 param serviceShort string = 'ashc2nmin'
@@ -35,7 +32,7 @@ param arbDeploymentSPObjectId string = ''
 #disable-next-line secure-parameter-default
 param arbDeploymentServicePrincipalSecret string = ''
 
-@description('Required. The service principal ID of the Azure Stack HCI Resource Provider in this tenant.')
+@description('Required. The service principal object ID of the Azure Stack HCI Resource Provider in this tenant. Can be fetched via `Get-AzADServicePrincipal -ApplicationId 1412d89f-b8a8-4111-b4fd-e82905cbd85d` after the \'Microsoft.AzureStackHCI\' was registered in the subscription.')
 @secure()
 #disable-next-line secure-parameter-default
 param hciResourceProviderObjectId string = ''
@@ -78,21 +75,23 @@ module testDeployment '../../../main.bicep' = {
   scope: resourceGroup
   params: {
     name: name
-    customLocationName: hciDependencies.outputs.customLocationName
-    clusterNodeNames: hciDependencies.outputs.clusterNodeNames
-    clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
-    defaultGateway: hciDependencies.outputs.defaultGateway
-    deploymentPrefix: deploymentPrefix
-    dnsServers: hciDependencies.outputs.dnsServers
-    domainFqdn: hciDependencies.outputs.domainFqdn
-    domainOUPath: hciDependencies.outputs.domainOUPath
-    endingIPAddress: hciDependencies.outputs.endingIPAddress
-    enableStorageAutoIp: hciDependencies.outputs.enableStorageAutoIp
-    keyVaultName: hciDependencies.outputs.keyVaultName
-    networkIntents: hciDependencies.outputs.networkIntents
-    startingIPAddress: hciDependencies.outputs.startingIPAddress
-    storageConnectivitySwitchless: false
-    storageNetworks: hciDependencies.outputs.storageNetworks
-    subnetMask: hciDependencies.outputs.subnetMask
+    deploymentSettings: {
+      customLocationName: hciDependencies.outputs.customLocationName
+      clusterNodeNames: hciDependencies.outputs.clusterNodeNames
+      clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
+      defaultGateway: hciDependencies.outputs.defaultGateway
+      deploymentPrefix: deploymentPrefix
+      dnsServers: hciDependencies.outputs.dnsServers
+      domainFqdn: hciDependencies.outputs.domainFqdn
+      domainOUPath: hciDependencies.outputs.domainOUPath
+      endingIPAddress: hciDependencies.outputs.endingIPAddress
+      enableStorageAutoIp: hciDependencies.outputs.enableStorageAutoIp
+      keyVaultName: hciDependencies.outputs.keyVaultName
+      networkIntents: hciDependencies.outputs.networkIntents
+      startingIPAddress: hciDependencies.outputs.startingIPAddress
+      storageConnectivitySwitchless: false
+      storageNetworks: hciDependencies.outputs.storageNetworks
+      subnetMask: hciDependencies.outputs.subnetMask
+    }
   }
 }
