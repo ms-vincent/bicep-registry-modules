@@ -5,7 +5,7 @@ metadata description = 'This test deploys an Azure VM to host a 2 node switched 
 
 @description('Optional. The name of the resource group to deploy for testing purposes.')
 @maxLength(90)
-param resourceGroupName string = 'dep-azure-stack-hci.cluster-${serviceShort}-rg' // TODO: Add namePrefix
+param resourceGroupName string = 'dep-${namePrefix}-azure-stack-hci.cluster-${serviceShort}-rg'
 
 @description('Optional. A short identifier for the kind of deployment. Should be kept short to not run into resource-name length-constraints.')
 param serviceShort string = 'ashc2nmin'
@@ -48,8 +48,8 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   location: enforcedLocation
 }
 
-module hciDependencies 'dependencies.bicep' = {
-  name: '${uniqueString(deployment().name, enforcedLocation)}-test-hcidependencies-${serviceShort}'
+module nestedDependencies 'dependencies.bicep' = {
+  name: '${uniqueString(deployment().name, enforcedLocation)}-nestedDependencies'
   scope: resourceGroup
   params: {
     arbDeploymentAppId: arbDeploymentAppId
@@ -75,17 +75,17 @@ module testDeployment '../../../main.bicep' = {
   params: {
     name: name
     deploymentSettings: {
-      customLocationName: hciDependencies.outputs.customLocationName
-      clusterNodeNames: hciDependencies.outputs.clusterNodeNames
-      clusterWitnessStorageAccountName: hciDependencies.outputs.clusterWitnessStorageAccountName
+      customLocationName: nestedDependencies.outputs.customLocationName
+      clusterNodeNames: nestedDependencies.outputs.clusterNodeNames
+      clusterWitnessStorageAccountName: nestedDependencies.outputs.clusterWitnessStorageAccountName
       defaultGateway: '172.20.0.1'
       deploymentPrefix: deploymentPrefix
       dnsServers: ['172.20.0.1']
       domainFqdn: 'hci.local'
-      domainOUPath: hciDependencies.outputs.domainOUPath
+      domainOUPath: nestedDependencies.outputs.domainOUPath
       endingIPAddress: '172.20.0.7'
       enableStorageAutoIp: true
-      keyVaultName: hciDependencies.outputs.keyVaultName
+      keyVaultName: nestedDependencies.outputs.keyVaultName
       networkIntents: [
         {
           adapter: ['mgmt']
