@@ -11,29 +11,30 @@ metadata description = 'This instance deploys the module saving all its secrets 
 @maxLength(90)
 param resourceGroupName string = 'dep-${namePrefix}-cache-redisenterprise-${serviceShort}-rg'
 
-@description('Optional. The location to deploy resources to.')
-param resourceLocation string = deployment().location
-
 @description('Optional. A short identifier for the kind of deployment. Should be kept short to not run into resource-name length-constraints.')
 param serviceShort string = 'crekvs'
 
 @description('Optional. A token to inject into the name of each resource.')
 param namePrefix string = '#_namePrefix_#'
 
+// Enforce uksouth as AMR SKUs are not available in all regions
+#disable-next-line no-hardcoded-location
+var enforcedLocation = 'uksouth'
+
 // ============== //
 // General resources
 // ============== //
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: resourceGroupName
-  location: resourceLocation
+  location: enforcedLocation
 }
 
 module nestedDependencies 'dependencies.bicep' = {
   scope: resourceGroup
-  name: '${uniqueString(deployment().name, resourceLocation)}-nestedDependencies'
+  name: '${uniqueString(deployment().name, enforcedLocation)}-nestedDependencies'
   params: {
     keyVaultName: 'dep-${namePrefix}-kv-${serviceShort}'
-    location: resourceLocation
+    location: enforcedLocation
   }
 }
 
@@ -43,9 +44,9 @@ module nestedDependencies 'dependencies.bicep' = {
 
 module testDeployment '../../../main.bicep' = {
   scope: resourceGroup
-  name: '${uniqueString(deployment().name, resourceLocation)}-test-${serviceShort}'
+  name: '${uniqueString(deployment().name, enforcedLocation)}-test-${serviceShort}'
   params: {
-    location: resourceLocation
+    location: enforcedLocation
     name: '${namePrefix}kvref'
     database: {
       secretsExportConfiguration: {
