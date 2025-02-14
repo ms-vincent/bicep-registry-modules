@@ -1,6 +1,5 @@
 metadata name = 'Redis Enterprise and Azure Managed Redis (Preview)'
 metadata description = 'This module deploys a Redis Enterprise or Azure Managed Redis (Preview) cache.'
-metadata owner = 'Azure/module-maintainers'
 
 @description('Optional. Location for all resources.')
 param location string = resourceGroup().location
