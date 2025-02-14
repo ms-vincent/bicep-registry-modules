@@ -54,6 +54,7 @@ module testDeployment '../../../main.bicep' = [
     name: '${uniqueString(deployment().name, enforcedPairedLocation)}-test-${serviceShort}-${iteration}'
     params: {
       name: '${namePrefix}${serviceShort}002'
+      skuName: 'Balanced_B10'
       location: enforcedPairedLocation
       database: {
         geoReplication: {

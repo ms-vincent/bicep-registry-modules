@@ -44,6 +44,7 @@ module testDeployment '../../../main.bicep' = [
     params: {
       name: '${namePrefix}${serviceShort}001'
       location: enforcedLocation
+      skuName: 'Balanced_B10'
     }
   }
 ]
