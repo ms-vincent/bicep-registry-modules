@@ -13,7 +13,6 @@ resource redisCluster 'Microsoft.Cache/redisEnterprise@2024-09-01-preview' = {
   sku: {
     name: 'Balanced_B10'
   }
-  zones: ['1', '2', '3']
 
   resource redisDatabase 'databases@2024-09-01-preview' = {
     name: 'default'
