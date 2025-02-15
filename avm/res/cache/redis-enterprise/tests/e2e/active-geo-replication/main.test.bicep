@@ -19,7 +19,7 @@ param namePrefix string = '#_namePrefix_#'
 
 // Not all regions support zone-redundancy, so hardcoding 2 zone-enabled locations here
 #disable-next-line no-hardcoded-location
-var enforcedLocation = 'northeurope'
+var enforcedLocation = 'ukwest'
 #disable-next-line no-hardcoded-location
 var enforcedPairedLocation = 'uksouth'
 
