@@ -453,7 +453,7 @@ Array of role assignments to create.
   - `'Owner'`
   - `'Reader'`
   - `'User Access Administrator'`
-  - `'Role Based Access Control Administrator (Preview)'`
+  - `'Role Based Access Control Administrator'`
 
 **Required parameters**
 
