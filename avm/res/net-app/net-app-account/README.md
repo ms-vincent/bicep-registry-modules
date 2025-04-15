@@ -1,6 +1,6 @@
 # Azure NetApp Files `[Microsoft.NetApp/netAppAccounts]`
 
-This module deploys an Azure NetApp File.
+This module deploys an Azure NetApp Files Account and the associated resource types such as capacity pools  volumes, and backups.
 
 ## Navigation
 
@@ -1241,6 +1241,7 @@ The daily backups to keep.
 - Type: int
 - MinValue: 2
 - MaxValue: 1019
+  (The maximum hourly, daily, weekly, and monthly backup retention counts _combined_ is 1019)
 
 ### Parameter: `backupPolicies.enabled`
 
@@ -1262,6 +1263,9 @@ The monthly backups to keep.
 
 - Required: No
 - Type: int
+- MinValue: 2
+- MaxValue: 1019
+  (The maximum hourly, daily, weekly, and monthly backup retention counts _combined_ is 1019)
 
 ### Parameter: `backupPolicies.name`
 
@@ -1276,7 +1280,10 @@ The weekly backups to keep.
 
 - Required: No
 - Type: int
-
+- MinValue: 2
+- MaxValue: 1019
+  (The maximum hourly, daily, weekly, and monthly backup retention counts _combined_ is 1019)
+  
 ### Parameter: `backupVault`
 
 The netapp backup vault to create & configure.
